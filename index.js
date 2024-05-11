@@ -37,6 +37,7 @@ async function run() {
         // Connect the client to the server	(optional starting in v4.7)
         await client.connect();
         const blogsCollection = client.db('blogosphereBuzz').collection('blogs')
+        const commentsCollection = client.db('blogosphereBuzz').collection('comments')
 
         // get all blogs
         app.get('/blogs', async (req, res) => {
@@ -59,6 +60,13 @@ async function run() {
             const result = await blogsCollection.insertOne(blog)
             res.send(result)
             // console.log(blog);
+        })
+
+        // add comment
+        app.post('/add-comment', async (req, res) => {
+            const comment = req.body
+            const result = await commentsCollection.insertOne(comment)
+            res.send(comment)
         })
 
 
