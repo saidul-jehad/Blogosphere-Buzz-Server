@@ -38,19 +38,27 @@ async function run() {
         await client.connect();
         const blogsCollection = client.db('blogosphereBuzz').collection('blogs')
 
-        // get blogs
+        // get all blogs
         app.get('/blogs', async (req, res) => {
             const cursor = blogsCollection.find()
             const result = await cursor.toArray()
             res.send(result)
         })
 
+        // get specific blog by req id
+        app.get('/blog/:id', async (req, res) => {
+            const id = req.params.id
+            const query = { _id: new ObjectId(id) }
+            const result = await blogsCollection.findOne(query)
+            res.send(result)
+        })
+
         // Add Blog 
         app.post('/add-blog', async (req, res) => {
             const blog = req.body
-            // console.log(blog);
             const result = await blogsCollection.insertOne(blog)
             res.send(result)
+            // console.log(blog);
         })
 
 
