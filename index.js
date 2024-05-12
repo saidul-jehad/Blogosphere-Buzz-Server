@@ -63,6 +63,23 @@ async function run() {
             // console.log(blog);
         })
 
+        // update blog by id
+        app.put('/update-blog/:id', async (req, res) => {
+            const id = req.params.id
+            const newBlog = req.body
+            const filter = { _id: new ObjectId(id) }
+            const options = { upsert: true }
+            const doc = {
+                $set: {
+                    ...newBlog
+                }
+            }
+
+            const result = await blogsCollection.updateOne(filter, doc, options)
+            res.send(result)
+        })
+
+
         // add comment
         app.post('/add-comment', async (req, res) => {
             const comment = req.body
@@ -70,10 +87,13 @@ async function run() {
             res.send(comment)
         })
 
-        // get all comment
-        app.get('/all-comments', async (req, res) => {
-            const cursor = commentsCollection.find()
-            const result = await cursor.toArray()
+        // get comment by id 
+        app.get('/comment/:id', async (req, res) => {
+            const reqId = req.params.id
+            console.log(reqId);
+            const query = { id: reqId }
+            const result = await commentsCollection.find(query).toArray()
+            // console.log(result);
             res.send(result)
         })
 
