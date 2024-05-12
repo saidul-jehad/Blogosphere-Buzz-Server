@@ -11,6 +11,7 @@ app.use(
     cors({
         origin: [
             "http://localhost:5173",
+            "https://blogosphere-buzz.netlify.app"
         ],
         credentials: true,
     })
@@ -67,6 +68,13 @@ async function run() {
             const comment = req.body
             const result = await commentsCollection.insertOne(comment)
             res.send(comment)
+        })
+
+        // get all comment
+        app.get('/all-comments', async (req, res) => {
+            const cursor = commentsCollection.find()
+            const result = await cursor.toArray()
+            res.send(result)
         })
 
 
