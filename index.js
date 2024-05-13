@@ -39,6 +39,7 @@ async function run() {
         await client.connect();
         const blogsCollection = client.db('blogosphereBuzz').collection('blogs')
         const commentsCollection = client.db('blogosphereBuzz').collection('comments')
+        const wishlistCollection = client.db('blogosphereBuzz').collection('wishlist')
 
         // get all blogs
         app.get('/blogs', async (req, res) => {
@@ -47,12 +48,31 @@ async function run() {
             res.send(result)
         })
 
+        // get blogs by category 
+        app.get('/blogs/:category', async (req, res) => {
+            const reqCategory = req.params.category
+            const query = { category: reqCategory }
+            const result = await blogsCollection.find(query).toArray()
+            res.send(result)
+        })
+
+
+
         // get specific blog by req id
         app.get('/blog/:id', async (req, res) => {
             const id = req.params.id
             const query = { _id: new ObjectId(id) }
             const result = await blogsCollection.findOne(query)
             res.send(result)
+        })
+
+        // blog search
+        app.get('/blog-search/:search', async (req, res) => {
+            const reqSearch = req.params.search
+            const result = await blogsCollection.find({ $text: { $title: reqSearch } })
+            // db.articles.find({ $text: { $search: "сы́рники CAFÉS" } })
+            res.send(result)
+
         })
 
         // Add Blog 
@@ -84,7 +104,7 @@ async function run() {
         app.post('/add-comment', async (req, res) => {
             const comment = req.body
             const result = await commentsCollection.insertOne(comment)
-            res.send(comment)
+            res.send(result)
         })
 
         // get comment by id 
@@ -97,6 +117,29 @@ async function run() {
             res.send(result)
         })
 
+        // Add Wishlist
+        app.post('/add-wishlist', async (req, res) => {
+            const wishlist = req.body
+            const result = await wishlistCollection.insertOne(wishlist)
+            res.send(result)
+        })
+
+        // get wishlist by email
+        app.get('/wishlists/:email', async (req, res) => {
+            const reqEmail = req.params.email
+            // console.log(reqEmail);
+            const query = { userEmail: reqEmail }
+            const result = await wishlistCollection.find(query).toArray()
+            res.send(result)
+        })
+
+        // wishlist Delete by id 
+        app.delete('/wishlist/:id', async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: id }
+            const result = await wishlistCollection.deleteOne(query)
+            res.send(result)
+        })
 
 
         // Send a ping to confirm a successful connection
