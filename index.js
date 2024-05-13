@@ -48,6 +48,12 @@ async function run() {
             res.send(result)
         })
 
+        // get recent blog
+        app.get("/recent-blog", async (req, res) => {
+            const result = await blogsCollection.find().sort({ timeStamp: -1 }).toArray()
+            res.send(result)
+        })
+
         // get blogs by category 
         app.get('/blogs/:category', async (req, res) => {
             const reqCategory = req.params.category
