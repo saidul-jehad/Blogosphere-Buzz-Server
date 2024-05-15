@@ -1,5 +1,7 @@
 const express = require('express')
 const cors = require('cors')
+const jwt = require("jsonwebtoken")
+const cookieParser = require("cookie-parser")
 require('dotenv').config()
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const app = express()
@@ -17,8 +19,35 @@ app.use(
     })
 );
 app.use(express.json())
+app.use(cookieParser())
+
+// jwt token middle ware
+
+const verifyToken = async (req, res, next) => {
+    const token = req?.cookies?.token
+    // console.log("token in the middleWare", token);
+
+    if (!token) {
+        return res.status(401).send({ message: "unAuthorize access" })
+    }
+    else {
+        jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+            if (err) {
+                return res.status(403).send({ message: "Unauthorized Access" })
+            }
+            req.user = decoded
+            next()
+        })
+    }
+}
 
 
+
+const cookieOptions = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
+};
 
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.ujjqksd.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
@@ -36,11 +65,35 @@ const client = new MongoClient(uri, {
 async function run() {
     try {
         // Connect the client to the server	(optional starting in v4.7)
-        await client.connect();
+        // await client.connect();
         const blogsCollection = client.db('blogosphereBuzz').collection('blogs')
         const commentsCollection = client.db('blogosphereBuzz').collection('comments')
         const wishlistCollection = client.db('blogosphereBuzz').collection('wishlist')
 
+
+        // jwt related Api
+        app.post("/jwt", async (req, res) => {
+            const user = req.body;
+            // console.log("user for token", user);
+            const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '2h' });
+
+            res
+                .cookie("token", token, cookieOptions)
+                .send({ success: true });
+        });
+
+
+        //clearing Token
+        app.post("/logout", async (req, res) => {
+            const user = req.body;
+            // console.log("logging out", user);
+            res
+                .clearCookie("token", { ...cookieOptions, maxAge: 0 })
+                .send({ success: true });
+        });
+
+
+        /*********************************************************************************/
         // get all blogs
         app.get('/blogs', async (req, res) => {
             const cursor = blogsCollection.find()
@@ -52,6 +105,25 @@ async function run() {
         app.get("/recent-blog", async (req, res) => {
             const result = await blogsCollection.find().sort({ timeStamp: -1 }).toArray()
             res.send(result)
+        })
+
+        // get top blogs
+        app.get('/top-blogs', async (req, res) => {
+            const blogs = await blogsCollection.find().toArray()
+            const blogsWithWordCount = blogs?.map(blog => ({
+
+                _id: blog._id,
+                title: blog.title,
+                short_description: blog.short_description,
+                long_description: blog.long_description,
+                bloggerName: blog.bloggerName,
+                bloggerProfilePic: blog.bloggerProfilePic,
+                wordCount: blog.long_description.split(/\s+/).length
+            }))
+
+            blogsWithWordCount.sort((a, b) => b.wordCount - a.wordCount);
+            const topBlogs = blogsWithWordCount
+            res.send(topBlogs.slice(0, 10))
         })
 
         // get blogs by category 
@@ -75,14 +147,14 @@ async function run() {
         // blog search
         app.get('/blog-search/:search', async (req, res) => {
             const reqSearch = req.params.search
-            const result = await blogsCollection.find({ $text: { $title: reqSearch } })
-            // db.articles.find({ $text: { $search: "сы́рники CAFÉS" } })
+
+            const result = await blogsCollection.find({ title: { $regex: reqSearch, $options: 'i' } }).toArray()
             res.send(result)
 
         })
 
         // Add Blog 
-        app.post('/add-blog', async (req, res) => {
+        app.post('/add-blog', verifyToken, async (req, res) => {
             const blog = req.body
             const result = await blogsCollection.insertOne(blog)
             res.send(result)
@@ -116,7 +188,6 @@ async function run() {
         // get comment by id 
         app.get('/comment/:id', async (req, res) => {
             const reqId = req.params.id
-            console.log(reqId);
             const query = { id: reqId }
             const result = await commentsCollection.find(query).toArray()
             // console.log(result);
@@ -126,12 +197,20 @@ async function run() {
         // Add Wishlist
         app.post('/add-wishlist', async (req, res) => {
             const wishlist = req.body
+            const query = { id: wishlist?.id, userEmail: wishlist?.userEmail }
+            const alreadyWishlist = await wishlistCollection.findOne(query)
+            if (alreadyWishlist) {
+                return res
+                    .status(400)
+                    .send("Already Wishlisted")
+            }
+            // console.log(alreadyWishlist);
             const result = await wishlistCollection.insertOne(wishlist)
             res.send(result)
         })
 
         // get wishlist by email
-        app.get('/wishlists/:email', async (req, res) => {
+        app.get('/wishlists/:email', verifyToken, async (req, res) => {
             const reqEmail = req.params.email
             // console.log(reqEmail);
             const query = { userEmail: reqEmail }
@@ -149,7 +228,7 @@ async function run() {
 
 
         // Send a ping to confirm a successful connection
-        await client.db("admin").command({ ping: 1 });
+        // await client.db("admin").command({ ping: 1 });
         console.log("Pinged your deployment. You successfully connected to MongoDB!");
     } finally {
         // Ensures that the client will close when you finish/error
